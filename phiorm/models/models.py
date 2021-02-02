@@ -3,8 +3,11 @@ import json
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from orm import exceptions
+from phiorm import exceptions
 # from orm import fields as _fields
+
+
+__all__ = ('Model', 'PostgresModel', 'JSONModel')
 
 
 class Model(ABC):
@@ -12,9 +15,7 @@ class Model(ABC):
     Abstract Model Base containing all the necessary interfaces
     and transparent functionality with Fields
 
-    Every concrete implementation must define:
-
-    pk(self): returns the pk fields of the class
+    EVERY IMPLEMENTATION MUST DEFINE:
 
     save(self): comits all of the model's serialized fields
     (use with the serialize(self) method)
@@ -24,6 +25,10 @@ class Model(ABC):
 
     filter(cls, **kwargs): classmethod that handles SELECT ... WHERE ...
     like queries
+
+    HELPER METHODS THAT CAN BE REDEFINED:
+
+    pk(self): for quick pk lookup (O(n) as of right now)
     '''
     fields = dict()
 
@@ -102,15 +107,23 @@ class Model(ABC):
     def from_dict(cls, _dict):
         return cls(**_dict)
 
-    @abstractmethod
     def pk(self):
         '''
         to be used by many other internal methods,
         like foreign keys for example.
 
         allows defining a combination on fields as pk.
+
+        can be overwritten for performance or preference
         '''
-        raise NotImplementedError()
+        pks = []
+        for field in self.fields:
+            if self.fields[field].primary_key:
+                pks.append(self.fields[field])
+        if len(pks) == 1:
+            return pks[0]
+        else:
+            return tuple(pks)
 
     @abstractmethod
     def save(self):
@@ -135,7 +148,15 @@ class Model(ABC):
 
 
 class PostgresModel(Model):
-    pass
+    '''
+    Models that refer to a postgres DB
+    '''
+    def save(self):
+        raise NotImplementedError
+    
+    @classmethod
+    def filter(cls, **kwargs):
+        raise NotImplementedError
 
 
 # TODO Mutex, locks, etc...

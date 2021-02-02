@@ -1,7 +1,7 @@
 import os
 import dotenv
 import pathlib
-from orm import exceptions
+from phiorm import exceptions
 
 DEBUG = True
 BASE_DIR = pathlib.Path('.')

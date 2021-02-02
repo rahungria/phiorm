@@ -1,5 +1,8 @@
-from orm import exceptions
-from orm import models
+from phiorm import exceptions
+from phiorm import models
+
+
+__all__ = ('Validator', 'IntField', 'StrField', 'ForeignKeyField')
 
 
 class Validator:
@@ -37,10 +40,11 @@ class Field:
     Extendable by extending the "__call__" method.
     '''
     def __init__(
-        self, _type: type,
+        self, _type: type, primary_key=False,
         default=None, is_null=False, validators=tuple(),
     ):
         self.type = _type
+        self.primary_key = primary_key
         self.default = default
         self.is_null = is_null
         for _validator in validators:
