@@ -1,0 +1,7 @@
+wheel
+ipython < 7.20
+jedi < 0.18
+
+philog < 0.2
+psycopg2-binary < 2.9
+python-dotenv < 0.16
