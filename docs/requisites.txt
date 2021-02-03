@@ -1,0 +1,20 @@
+Fields
+    at least Integer, String, Float, Foreign Keys[, Binary][, JSON]
+    ForeignKey on delete (cascade, set null)
+    automaticaly validate based on input
+    predict most database errors without requiring to access
+    allow custom user validation for columns(constraints maybe?) 
+
+Models
+    allow creation of db models/tables/documents by simply inheriting the database equivalent and defining the fields/columns
+    Unique constraints
+    allow simple access to db based on a current object, or fields/cols to query
+    allow for diferent implementation for diferent dbs/drivers without much work
+    [allow for automatic creation of tables based on model]
+    CRUD in 3 methods save(create, update), filter(read), delete(delete)
+        save must be smart to know when to create a row, and when to update an existing row (if needed)
+        filter must be smart to deal with foreign keys (joining or multiple queries, intermediate tables, etc...)
+        delete must must be smart to not delete non existing rows/unsaved objects and deal with on delete events/triggers
+    cache data to reduce db accesses
+    allow for simple serialization/deserialization
+

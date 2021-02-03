@@ -1,0 +1,9 @@
+1.
+    Create a model in database by only defining fields
+    Define columns for Integers, Strings, Floats, Blobs
+    Simply create objects without commiting to database
+    Saving a model to database
+        Rollback on failure
+        Receiving any errors related to operation
+    Receive MOST errors before commiting to database, still on Object abstraction
+    Select rows from database based on column queries

@@ -1,9 +1,10 @@
-import os
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
 
 from phiorm import exceptions
+from phiorm import settings
+from phiorm import db
 # from orm import fields as _fields
 
 
@@ -26,10 +27,15 @@ class Model(ABC):
     filter(cls, **kwargs): classmethod that handles SELECT ... WHERE ...
     like queries
 
+    delete(self): deletes an object...
+
     HELPER METHODS THAT CAN BE REDEFINED:
 
     pk(self): for quick pk lookup (O(n) as of right now)
+
+    get_connection(cls): the retrieve the connection to use
     '''
+    _cache = dict()
     fields = dict()
 
     def __init__(self, **kwargs):
@@ -39,11 +45,6 @@ class Model(ABC):
                 'called fields, containing every field declaration '
                 '(using the orm.fields.Field object)'
             )
-        # for key in kwargs:
-        #     if key not in self.fields:
-        #         raise KeyError(
-        #             f'"{key}" not a field in "{self.__class__.__name__}"'
-        #         )
         self.__kwargs_in_fields(**kwargs)
 
         for field in self.fields:
@@ -63,7 +64,10 @@ class Model(ABC):
         return f'<{self.__class__.__name__}: {self.pk()}>'
 
     def __repr__(self):
-        return str(self)
+        _dict = dict()
+        for field in self.fields:
+            _dict[field] = self.fields[field].serialize()
+        return _dict
 
     def __setattr__(self, name, value):
         if name in self.fields:
@@ -97,12 +101,11 @@ class Model(ABC):
             )
         return True
 
-    def serialize(self):
-        _dict = dict()
+    def serialize(self, dict_=False):
+        _values = []
         for field in self.fields:
-            # _dict[field] = getattr(self, field)
-            _dict[field] = self.fields[field].serialize()
-        return _dict
+            _values.append(self.fields[field].serialize())
+        return tuple(_values)
 
     @classmethod
     def from_dict(cls, _dict):
@@ -126,7 +129,7 @@ class Model(ABC):
     @abstractmethod
     def save(self):
         '''
-        Commits this model instance to storage.
+        Commits this model instance to storage. (Create/Update)
 
         Each implementation must handle db connection/serialization
         it's own way
@@ -137,12 +140,28 @@ class Model(ABC):
     @abstractmethod
     def filter(cls, **kwargs):
         '''
-        handles a SELECT ... WHERE ... statement
+        handles a SELECT ... WHERE ... statement. (Read)
 
         return an iterable (maybe special object later) containing
         all matches
         '''
         raise NotImplementedError()
+
+    @abstractmethod
+    def delete(self):
+        '''
+        Deletes an entry (Delete)
+        '''
+        pass
+
+    @classmethod
+    def get_connection(cls):
+        '''
+        helper method to be used by all models of a certain DBM implementation
+
+        usualy not implemented by a User Leaf...
+        '''
+        return db.ConnectionManager.get(name=settings.DATABASE['DBDRIVER'])
 
 
 class PostgresModel(Model):
@@ -150,10 +169,12 @@ class PostgresModel(Model):
     Models that refer to a postgres DB
     '''
     def save(self):
+        conn = self.get_connection()
         raise NotImplementedError
     
     @classmethod
     def filter(cls, **kwargs):
+        conn = cls.get_connection()
         raise NotImplementedError
 
 
@@ -180,7 +201,8 @@ class JSONModel(Model):
 
     def save(self):
         if not self._model_path().exists():
-            os.makedirs(self._model_path())
+            # os.makedirs(self._model_path())
+            self._model_path().mkdir()
             with open(self.model_file(), 'w') as f:
                 f.write('{}')
 

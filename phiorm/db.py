@@ -43,7 +43,7 @@ class ConnectionManager:
             cls._connections[name].close()
         except KeyError:
             raise exceptions.ORMException(
-                "tried closing exception that doesn't exist"
+                "tried closing connection that doesn't exist"
             )
 
     @classmethod
