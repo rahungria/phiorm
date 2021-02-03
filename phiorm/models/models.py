@@ -39,17 +39,18 @@ class Model(ABC):
                 'called fields, containing every field declaration '
                 '(using the orm.fields.Field object)'
             )
-        for key in kwargs:
-            if key not in self.fields:
-                raise KeyError(
-                    f'"{key}" not a field in "{self.__class__.__name__}"'
-                )
+        # for key in kwargs:
+        #     if key not in self.fields:
+        #         raise KeyError(
+        #             f'"{key}" not a field in "{self.__class__.__name__}"'
+        #         )
+        self.__kwargs_in_fields(**kwargs)
 
         for field in self.fields:
             if field not in kwargs:
                 if (
                     not self.fields[field].default and
-                    not self.fields[field].is_null
+                    not self.fields[field].null
                 ):
                     raise exceptions.RequiredFieldError(
                         f"Field: {field} doesn't"
@@ -119,11 +120,8 @@ class Model(ABC):
         pks = []
         for field in self.fields:
             if self.fields[field].primary_key:
-                pks.append(self.fields[field])
-        if len(pks) == 1:
-            return pks[0]
-        else:
-            return tuple(pks)
+                pks.append(self.fields[field].get())
+        return tuple(pks)
 
     @abstractmethod
     def save(self):
@@ -159,7 +157,6 @@ class PostgresModel(Model):
         raise NotImplementedError
 
 
-# TODO Mutex, locks, etc...
 class JSONModel(Model):
 
     @classmethod

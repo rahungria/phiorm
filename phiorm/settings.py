@@ -5,7 +5,7 @@ from phiorm import exceptions
 
 DEBUG = True
 BASE_DIR = pathlib.Path('.')
-DOTENV_PATH = BASE_DIR / 'dev.env' if DEBUG else BASE_DIR / 'prod.env'
+DOTENV_PATH = BASE_DIR / '.dev.env' if DEBUG else BASE_DIR / '.env'
 
 if not DOTENV_PATH.exists():
     raise exceptions.ORMException('Invalid path for ORM .env file')

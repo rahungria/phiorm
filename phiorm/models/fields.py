@@ -1,5 +1,5 @@
 from phiorm import exceptions
-from phiorm import models
+from phiorm.models import models
 
 
 __all__ = ('Validator', 'IntField', 'StrField', 'ForeignKeyField')
@@ -33,21 +33,19 @@ class Validator:
 # TODO delegate GET behaviour to field as well (__call__() or get())...
 class Field:
     '''
-    Base class for a model field.
+    Base class for a model field
 
-    Contains all base functionality for validation.
+    Contains all base functionality for validation
 
-    Extendable by extending the "__call__" method.
+    Extendable by overriding the "__call__" and "get" methods
     '''
-    def __init__(
-        self, _type: type, primary_key=False,
-        default=None, is_null=False, validators=tuple(),
-    ):
+    def __init__(self, _type, **kwargs):
         self.type = _type
-        self.primary_key = primary_key
-        self.default = default
-        self.is_null = is_null
-        for _validator in validators:
+        self.primary_key = kwargs.get('primary_key', False)
+        self.default = kwargs.get('default', None)
+        self.null = kwargs.get('null', True)
+        _validators = kwargs.get('validators', tuple())
+        for _validator in _validators:
             if type(_validator) is not Validator:
                 raise TypeError(
                     'each Validator must be an instance of Validator '
@@ -55,7 +53,7 @@ class Field:
                     f'found: {type(_validator)}'
                 )
         self.validators = []
-        self.validators.extend(validators)
+        self.validators.extend(_validators)
         self.value = None
 
     def get(self):
@@ -82,13 +80,13 @@ class Field:
         if value is None:
             if self.default:
                 self.value = self.default
-                return self.value
-            elif self.is_null:
+                return self.get()
+            elif self.null:
                 self.value = None
-                return self.value
+                return self.get()
             else:
                 raise exceptions.ValidationError(
-                    "This field not nullable"
+                    f"this {self.__name__} field can't be null"
                 )
 
         # type validation
@@ -118,23 +116,14 @@ class Field:
 
 class IntField(Field):
 
-    def __init__(self, default=None, is_null=False, validators=tuple()):
-        super().__init__(
-            _type=int,
-            default=default, is_null=is_null, validators=validators
-        )
+    def __init__(self, **kwargs):
+        super().__init__(_type=int, **kwargs)
 
 
 class StrField(Field):
 
-    def __init__(
-        self, max_length=255,
-        default=None, is_null=False, validators=list()
-    ):
-        super().__init__(
-            _type=str,
-            default=default, is_null=is_null, validators=validators
-        )
+    def __init__(self, max_length=255, **kwargs):
+        super().__init__(_type=str, **kwargs)
         self.max_length = max_length
         self.validators.append(
             Validator(
@@ -148,13 +137,8 @@ class StrField(Field):
 # TODO cascades depend of more robust messaging/event system
 class ForeignKeyField(Field):
 
-    def __init__(
-        self, ref_model, is_null=False, validators=tuple()
-    ):
-        super().__init__(
-            _type=ref_model, default=None,
-            is_null=is_null, validators=validators
-        )
+    def __init__(self, ref_model, **kwargs):
+        super().__init__(_type=ref_model, **kwargs)
         if not issubclass(ref_model, models.Model):
             raise exceptions.ValidationError(
                 'Foreign key must reference only classes that '
