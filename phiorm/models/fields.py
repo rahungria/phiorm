@@ -135,6 +135,7 @@ class StrField(Field):
 
 # TODO depends on functional retrieve functionality
 # TODO cascades depend of more robust messaging/event system
+# TODO DE-serialize fk...
 class ForeignKeyField(Field):
 
     def __init__(self, ref_model, **kwargs):
@@ -153,5 +154,4 @@ class ForeignKeyField(Field):
         )
 
     def serialize(self):
-        ref = super().serialize()
-        return ref.pk()
+        return self.get().pk()

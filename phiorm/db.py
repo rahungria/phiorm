@@ -7,7 +7,7 @@ import philog
 
 
 
-# TODO(rapha): abstract connection closing for every driver...
+# TODO: abstract connection closing for every driver...
 class ConnectionManager:
     '''
     class to manage all connections regardless of db/driver
@@ -32,7 +32,7 @@ class ConnectionManager:
                     f"{settings.DATABASE['DB_PORT']}"
                 )
         elif cls._connections[name].closed:
-            raise exceptions.ORMException(
+            raise exceptions.ConnectionError(
                 'Connection is closed.'
             )
         return cls._connections[name]
@@ -42,7 +42,7 @@ class ConnectionManager:
         try:
             cls._connections[name].close()
         except KeyError:
-            raise exceptions.ORMException(
+            raise exceptions.ConnectionError(
                 "tried closing connection that doesn't exist"
             )
 

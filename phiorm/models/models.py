@@ -19,8 +19,8 @@ class Model(ABC):
     EVERY IMPLEMENTATION MUST DEFINE:
 
     save(self): comits all of the model's serialized fields
-    (use with the serialize(self) method)
-    to storage, varying on implementation.
+    (use with the serialize(self) method) to storage,
+    varying on implementation.
     obs: post save fields that can only be set after saving to db
     must be set in this function
 
@@ -31,7 +31,13 @@ class Model(ABC):
 
     HELPER METHODS THAT CAN BE REDEFINED:
 
-    pk(self): for quick pk lookup (O(n) as of right now)
+    serialize(self): serializes obj to a valid model
+    given a specific dbdriver
+
+    deserialize(cls, obj): deserializes a specific dbdriver model
+    and returns an object
+
+    pk(cls): for quick pk lookup (O(n) as of right now)
 
     get_connection(cls): the retrieve the connection to use
     '''
@@ -45,20 +51,19 @@ class Model(ABC):
                 'called fields, containing every field declaration '
                 '(using the orm.fields.Field object)'
             )
-        self.__kwargs_in_fields(**kwargs)
+        self.__validate_kwargs_in_fields(**kwargs)
+        self.__validate_primary_key_exists()
 
+        # TODO add support for multiple pks
+        pk_count = 0
         for field in self.fields:
-            if field not in kwargs:
-                if (
-                    not self.fields[field].default and
-                    not self.fields[field].null
-                ):
-                    raise exceptions.RequiredFieldError(
-                        f"Field: {field} doesn't"
-                        "have a default and can't be null"
-                    )
+            pk_count += 1 if self.fields[field].primary_key else 0
             value = self.fields[field](value=kwargs.get(field))
             setattr(self, field, value)
+        if pk_count > 1:
+            raise exceptions.ORMFatal(
+                f'MODEL ONLY SUPPORTS ONE PRIMARY KEY AS OF RIGHT NOW'
+            )
 
     def __str__(self):
         return f'<{self.__class__.__name__}: {self.pk()}>'
@@ -67,15 +72,17 @@ class Model(ABC):
         _dict = dict()
         for field in self.fields:
             _dict[field] = self.fields[field].serialize()
-        return _dict
+        return str(_dict)
 
     def __setattr__(self, name, value):
-        if name in self.fields:
+        if name == 'fields':
+            raise exceptions.ORMError(
+                'A model only allows to SET its fields'
+            )
+        elif name in self.fields:
             value = self.fields[name](value)
         else:
-            raise exceptions.ModelPermissionError(
-                'A model only allows settings its fields'
-            )
+            return super().__setattr__(name, value)
 
     def __getattr__(self, name: str):
         if name in self.fields:
@@ -83,23 +90,45 @@ class Model(ABC):
         else:
             return super().__getattr__(name)
 
-    def __kwargs_in_fields(self, **kwargs):
+    @classmethod
+    def __validate_kwargs_in_fields(cls, greedy=False,**kwargs):
         '''
         helper to determine if args passed to function
         exist in this model's fields
 
-        raises AttributeError if any argument fails
+        greedy -- stop at first error
+
+        Raises:
+        phiorm.exceptions.FieldError if any argument fails
         '''
         entries = []
         for entry in kwargs:
-            if entry not in self.fields:
+            if entry not in cls.fields:
                 entries.append(entry)
+                if greedy:
+                    raise exceptions.FieldError(
+                        f"column: {entry} doesn't exist in "
+                        f"{cls.__class__.__name__}",
+                        fields=tuple(entry)
+                    )
         if entries:
-            raise AttributeError(
+            raise exceptions.FieldError(
                 f"columns: {tuple(entries)} don't exist in "
-                f"{self.__class__.__name__}"
+                f"{cls.__class__.__name__}",
+                fields=tuple(entries)
             )
         return True
+
+    def __validate_primary_key_exists(self):
+        _pk_count = 0
+        for field in self.fields:
+            if self.fields[field].primary_key:
+                _pk_count += 1
+        if _pk_count == 0:
+            raise exceptions.FieldError(
+                f'{self.__class__.__name__} has no primary keys!',
+                fields=tuple()
+            )
 
     def serialize(self, dict_=False):
         _values = []
@@ -107,11 +136,26 @@ class Model(ABC):
             _values.append(self.fields[field].serialize())
         return tuple(_values)
 
+    # TODO implement deserialization from db model
+    # TODO implement proper fk deserialization
+    @classmethod
+    def deserialize(cls, obj):
+        # TODO raise exceptions...
+        assert type(obj) is tuple
+        assert len(cls.fields) == len(obj)
+
+        kwargs = {}
+        for i, key in enumerate(cls.fields):
+            kwargs[key] = obj[i]
+        return cls(**kwargs)
+
     @classmethod
     def from_dict(cls, _dict):
         return cls(**_dict)
 
-    def pk(self):
+    # TODO add support for multiple pks
+    @classmethod
+    def pk(cls):
         '''
         to be used by many other internal methods,
         like foreign keys for example.
@@ -120,11 +164,13 @@ class Model(ABC):
 
         can be overwritten for performance or preference
         '''
-        pks = []
-        for field in self.fields:
-            if self.fields[field].primary_key:
-                pks.append(self.fields[field].get())
-        return tuple(pks)
+        for field in cls.fields:
+            if cls.fields[field].primary_key:
+                return cls.fields[field].serialize()
+        raise exceptions.FieldError(
+            f'{cls.__name__} has no primary key!',
+            fields=tuple()
+        )
 
     @abstractmethod
     def save(self):
@@ -174,7 +220,15 @@ class PostgresModel(Model):
     
     @classmethod
     def filter(cls, **kwargs):
+        cls.__validate_kwargs_in_fields(greedy=True, **kwargs)
+        # TODO sanitize inputs more...
+        if cls.pk() in cls._cache:
+            relation = cls._cache[cls.pk()]
+            obj = cls.deserialize(relation)
+            return obj
         conn = cls.get_connection()
+
+    def delete(self):
         raise NotImplementedError
 
 
@@ -201,7 +255,6 @@ class JSONModel(Model):
 
     def save(self):
         if not self._model_path().exists():
-            # os.makedirs(self._model_path())
             self._model_path().mkdir()
             with open(self.model_file(), 'w') as f:
                 f.write('{}')
@@ -214,7 +267,7 @@ class JSONModel(Model):
         if str(self.pk()) not in _all:
             _all[str(self.pk())] = self.serialize()
         else:
-            raise exceptions.RepeatedPKError(
+            raise exceptions.ORMError(
                 f'instance with pk: {self.pk()} already exists. '
                 'Aborting...'
             )

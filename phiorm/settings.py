@@ -8,7 +8,7 @@ BASE_DIR = pathlib.Path('.')
 DOTENV_PATH = BASE_DIR / '.dev.env' if DEBUG else BASE_DIR / '.env'
 
 if not DOTENV_PATH.exists():
-    raise exceptions.ORMException('Invalid path for ORM .env file')
+    raise exceptions.ConfigurationError('Invalid path for ORM .env file')
 
 dotenv.load_dotenv(dotenv_path=DOTENV_PATH)
 
@@ -23,6 +23,6 @@ try:
     }
 except KeyError:
     DATABASE = None
-    raise exceptions.ORMException(
+    raise exceptions.ConfigurationError(
         '.env must define "DBDRIVER", "DATABASE", "USER", "PASSWORD"'
     )

@@ -11,6 +11,7 @@ class ORMFatal(ORMException):
         philog.fatal(
             f'Exception Caught: {msg}.'
         )
+        super().__init__(msg)
 
     def __str__(self):
         return self.msg
@@ -22,22 +23,30 @@ class ORMError(ORMException):
         philog.error(
             f'Exception Caught: {msg}.'
         )
+        super().__init__(msg)
 
     def __str__(self):
         return self.msg
 
 
-class RequiredFieldError(ORMException):
+class ConnectionError(ORMError):
     pass
 
 
-class ValidationError(ORMException):
+class ConfigurationError(ORMError):
     pass
 
 
-class ModelPermissionError(ORMException):
-    pass
+class FieldError(ORMError):
+    '''
+    Logged error exception
+
+    fields -- stores info on which fields caused the error
+    '''
+    def __init__(self, msg, fields):
+        self.fields = fields
+        super().__init__(msg)
 
 
-class RepeatedPKError(ORMException):
+class ValidationError(ORMError):
     pass
