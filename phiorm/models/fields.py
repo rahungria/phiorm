@@ -27,10 +27,6 @@ class Validator:
             )
 
 
-# TODO Inherit and create fields for more
-# specific cases datetime (defaults and when to set),
-# TODO Better __repr__ (to see when displaying all fields of a model)
-# TODO delegate GET behaviour to field as well (__call__() or get())...
 class Field:
     '''
     Base class for a model field
@@ -133,9 +129,6 @@ class StrField(Field):
         )
 
 
-# TODO depends on functional retrieve functionality
-# TODO cascades depend of more robust messaging/event system
-# TODO DE-serialize fk...
 class ForeignKeyField(Field):
 
     def __init__(self, ref_model, **kwargs):

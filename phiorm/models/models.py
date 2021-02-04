@@ -136,7 +136,7 @@ class Model(ABC):
             _values.append(self.fields[field].serialize())
         return tuple(_values)
 
-    # TODO implement deserialization from db model
+    # TODO auto fields (de)serialization
     # TODO implement proper fk deserialization
     @classmethod
     def deserialize(cls, obj):
@@ -221,12 +221,11 @@ class PostgresModel(Model):
     @classmethod
     def filter(cls, **kwargs):
         cls.__validate_kwargs_in_fields(greedy=True, **kwargs)
-        # TODO sanitize inputs more...
         if cls.pk() in cls._cache:
             relation = cls._cache[cls.pk()]
             obj = cls.deserialize(relation)
             return obj
-        conn = cls.get_connection()
+        # conn = cls.get_connection()
 
     def delete(self):
         raise NotImplementedError
