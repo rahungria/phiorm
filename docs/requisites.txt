@@ -15,6 +15,10 @@ Models
         save must be smart to know when to create a row, and when to update an existing row (if needed)
         filter must be smart to deal with foreign keys (joining or multiple queries, intermediate tables, etc...)
         delete must must be smart to not delete non existing rows/unsaved objects and deal with on delete events/triggers
+    must allow settings table constrains/indexes
     cache data to reduce db accesses
+        dedicated object to allow liberty of how to handle data queries/etc...
+        cache must allow objects with multiple columns pk and store objects based on ALL its indexes! so that cache[index] should result in success if present
+        the cache should not be used on searches without a given index
     allow for simple serialization/deserialization
 

@@ -6,4 +6,4 @@ from . import settings
 
 __version__ = '0.0.3'
 # __all__ = ['db', 'exceptions', 'models', 'fields', 'settings']
-modules = [db, exceptions, models, settings]
+# modules = [db, exceptions, models, settings]

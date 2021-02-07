@@ -1,5 +1,5 @@
 from phiorm import exceptions
-from phiorm.models import models
+from . import model
 
 
 __all__ = ('Validator', 'IntField', 'StrField', 'ForeignKeyField')
@@ -52,17 +52,20 @@ class Field:
         self.validators.extend(_validators)
         self.value = None
 
-    def get(self):
-        return self.value
-
     def serialize(self):
-        return self.value
+        return self.get()
+
+    def deserialize(self, value):
+        return self.set(value=value)
 
     def validate(self, value):
         for validator in self.validators:
             validator(value)
 
-    def __call__(self, value=None):
+    def get(self):
+        return self.value
+
+    def set(self, value=None):
         '''
         The field is called every time it is set.
 
@@ -87,24 +90,23 @@ class Field:
 
         # type validation
         if type(value) is not self.type:
-            print(f'{self.type} is not {type(value)}')
             raise exceptions.ValidationError(
                 f'Invalid type: expected {self.type}, '
                 f'received {type(value)}'
             )
 
         # explicit validators
-        for _validator in self.validators:
-            _validator(value)
+        self.validate(value)
 
         self.value = value
-        return self.value
+        return self.get()
 
     def __str__(self):
-        return (
-            f'{self.__class__.__name__}'
-            f'({self.value if self.value else self.default})'
-        )
+        self_vars = []
+        for entry in self.__dict__:
+            if self.__dict__[entry]:
+                self_vars.append(f"{entry}={self.__dict__[entry]}")
+        return f"{type(self).__name__}({', '.join(self_vars)})"
 
     def __repr__(self):
         return self.__str__()
@@ -133,7 +135,7 @@ class ForeignKeyField(Field):
 
     def __init__(self, ref_model, **kwargs):
         super().__init__(_type=ref_model, **kwargs)
-        if not issubclass(ref_model, models.Model):
+        if not issubclass(ref_model, model.Model):
             raise exceptions.ValidationError(
                 'Foreign key must reference only classes that '
                 'inherit orm.models.Model'
@@ -148,3 +150,7 @@ class ForeignKeyField(Field):
 
     def serialize(self):
         return self.get().pk()
+
+    def deserialize(self, value):
+        fk_obj = self.ref_model.filter(pk=value)
+        return super().deserialize(fk_obj)

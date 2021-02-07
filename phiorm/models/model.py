@@ -1,14 +1,13 @@
 import json
+from copy import deepcopy
 from abc import ABC, abstractmethod
-from pathlib import Path
 
 from phiorm import exceptions
 from phiorm import settings
 from phiorm import db
-# from orm import fields as _fields
 
 
-__all__ = ('Model', 'PostgresModel', 'JSONModel')
+__all__ = ('Model',)
 
 
 class Model(ABC):
@@ -41,16 +40,19 @@ class Model(ABC):
 
     get_connection(cls): the retrieve the connection to use
     '''
+    # TODO custom _cache object->hold memory of some cache inserts on same pk
+    # use algorithm to prefer one ever another/allow extending...
     _cache = dict()
-    fields = dict()
+    # fields = dict()
 
     def __init__(self, **kwargs):
-        if not self.fields:
+        if not type(self).fields:
             raise TypeError(
                 'Every child of orm.Model must declare a static dict '
                 'called fields, containing every field declaration '
                 '(using the orm.fields.Field object)'
             )
+        self.__dict__['fields'] = deepcopy(type(self).fields)
         self.__validate_kwargs_in_fields(**kwargs)
         self.__validate_primary_key_exists()
 
@@ -58,15 +60,16 @@ class Model(ABC):
         pk_count = 0
         for field in self.fields:
             pk_count += 1 if self.fields[field].primary_key else 0
-            value = self.fields[field](value=kwargs.get(field))
-            setattr(self, field, value)
+            value = self.fields[field].set(value=kwargs.get(field))
+            self.__dict__[field] = value
+            # setattr(self, field, value)
         if pk_count > 1:
             raise exceptions.ORMFatal(
                 f'MODEL ONLY SUPPORTS ONE PRIMARY KEY AS OF RIGHT NOW'
             )
 
     def __str__(self):
-        return f'<{self.__class__.__name__}: {self.pk()}>'
+        return f'<{type(self).__name__}: {self.pk()}>'
 
     def __repr__(self):
         _dict = dict()
@@ -76,11 +79,11 @@ class Model(ABC):
 
     def __setattr__(self, name, value):
         if name == 'fields':
-            raise exceptions.ORMError(
-                'A model only allows to SET its fields'
+            raise exceptions.ORMFatal(
+                "A model can't alter it's fields in runtime"
             )
         elif name in self.fields:
-            value = self.fields[name](value)
+            value = self.fields[name].set(value)
         else:
             return super().__setattr__(name, value)
 
@@ -106,15 +109,11 @@ class Model(ABC):
             if entry not in cls.fields:
                 entries.append(entry)
                 if greedy:
-                    raise exceptions.FieldError(
-                        f"column: {entry} doesn't exist in "
-                        f"{cls.__class__.__name__}",
-                        fields=tuple(entry)
-                    )
+                    break
         if entries:
             raise exceptions.FieldError(
                 f"columns: {tuple(entries)} don't exist in "
-                f"{cls.__class__.__name__}",
+                f"'{cls.__name__}'",
                 fields=tuple(entries)
             )
         return True
@@ -126,36 +125,53 @@ class Model(ABC):
                 _pk_count += 1
         if _pk_count == 0:
             raise exceptions.FieldError(
-                f'{self.__class__.__name__} has no primary keys!',
+                f'{type(self).__name__} has no primary keys!',
                 fields=tuple()
             )
 
     def serialize(self, dict_=False):
-        _values = []
-        for field in self.fields:
-            _values.append(self.fields[field].serialize())
-        return tuple(_values)
+        '''
+        serializes an object (self) into a tuple/dict of its fields
+
+        dict_ -- if True, returns a dict serialization instead of a tuple
+        '''
+        if dict_:
+            return json.dumps(repr(self))
+        else:
+            _values = []
+            for field in self.fields:
+                _values.append(self.fields[field].serialize())
+            return tuple(_values)
 
     # TODO auto fields (de)serialization
     # TODO implement proper fk deserialization
+    # TODO support data in form of kwargs (default to None... maybe?)
     @classmethod
-    def deserialize(cls, obj):
+    def deserialize(cls, data):
+        '''
+        deserializes a tuple (data) into an object an instance of this
+        model's object
+
+        loads into cache 
+        '''
         # TODO raise exceptions...
-        assert type(obj) is tuple
-        assert len(cls.fields) == len(obj)
+        assert type(data) is tuple
+        assert len(cls.fields) == len(data)
 
         kwargs = {}
         for i, key in enumerate(cls.fields):
-            kwargs[key] = obj[i]
-        return cls(**kwargs)
+            deserialized_data = cls.fields[key].deserialize(data[i])
+            kwargs[key] = deserialized_data
+        obj = cls(**kwargs)
+        cls._cache[obj.pk()] = obj
+        return obj
 
     @classmethod
     def from_dict(cls, _dict):
         return cls(**_dict)
 
     # TODO add support for multiple pks
-    @classmethod
-    def pk(cls):
+    def pk(self):
         '''
         to be used by many other internal methods,
         like foreign keys for example.
@@ -164,11 +180,11 @@ class Model(ABC):
 
         can be overwritten for performance or preference
         '''
-        for field in cls.fields:
-            if cls.fields[field].primary_key:
-                return cls.fields[field].serialize()
+        for field in self.fields:
+            if self.fields[field].primary_key:
+                return self.fields[field].get()
         raise exceptions.FieldError(
-            f'{cls.__name__} has no primary key!',
+            f'{type(self).__name__} has no primary key!',
             fields=tuple()
         )
 
@@ -184,9 +200,12 @@ class Model(ABC):
 
     @classmethod
     @abstractmethod
-    def filter(cls, **kwargs):
+    def filter(cls, pk=None, **kwargs):
         '''
-        handles a SELECT ... WHERE ... statement. (Read)
+        handles a SELECT ... WHERE ... statement (Read).
+        each kwarg must match a collumn
+
+        special case for primary key (pk)
 
         return an iterable (maybe special object later) containing
         all matches
@@ -208,90 +227,3 @@ class Model(ABC):
         usualy not implemented by a User Leaf...
         '''
         return db.ConnectionManager.get(name=settings.DATABASE['DBDRIVER'])
-
-
-class PostgresModel(Model):
-    '''
-    Models that refer to a postgres DB
-    '''
-    def save(self):
-        conn = self.get_connection()
-        raise NotImplementedError
-    
-    @classmethod
-    def filter(cls, **kwargs):
-        cls.__validate_kwargs_in_fields(greedy=True, **kwargs)
-        if cls.pk() in cls._cache:
-            relation = cls._cache[cls.pk()]
-            obj = cls.deserialize(relation)
-            return obj
-        # conn = cls.get_connection()
-
-    def delete(self):
-        raise NotImplementedError
-
-
-class JSONModel(Model):
-
-    @classmethod
-    def _model_path(cls):
-        return Path('.') / 'data'
-
-    @classmethod
-    def model_file(cls):
-        try:
-            return (
-                f'{cls._model_path().absolute()}/'
-                f'{cls.file}'
-            )
-        except AttributeError:
-            raise AttributeError(
-                'Models that inherit JSONModel must define a static '
-                'field: "file" that contains the name json file '
-                'to serialize and store the data. '
-                'ex: "file = \'Person.json\'"'
-            )
-
-    def save(self):
-        if not self._model_path().exists():
-            self._model_path().mkdir()
-            with open(self.model_file(), 'w') as f:
-                f.write('{}')
-
-        all_lines = None
-        with open(self.model_file(), 'r') as f:
-            all_lines = f.read()
-
-        _all = json.loads(all_lines or '{}')
-        if str(self.pk()) not in _all:
-            _all[str(self.pk())] = self.serialize()
-        else:
-            raise exceptions.ORMError(
-                f'instance with pk: {self.pk()} already exists. '
-                'Aborting...'
-            )
-        with open(self.model_file(), 'w') as f:
-            f.write(json.dumps(_all))
-
-    @classmethod
-    def filter(cls, **kwargs):
-        _all = None
-        with open(cls.model_file(), 'r') as f:
-            _all = f.read()
-
-        if _all:
-            _dict = json.loads(_all)
-            filtered = []
-            for entry in _dict:
-                valid_keys = []
-                for key in kwargs:
-                    try:
-                        value = _dict[entry][key]
-                        valid_keys.append(bool(value == kwargs[key]))
-                    except KeyError:
-                        raise AttributeError(f'column: "{key}" not in model')
-                if False not in valid_keys:
-                    filtered.append(_dict[entry])
-            return tuple(filtered)
-        else:
-            raise Exception('Database Empty!')
