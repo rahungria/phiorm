@@ -1,8 +1,10 @@
-import phiorm
+import phiorm.models as models
 
-
-class Test(phiorm.models.PostgresModel):
+class Test(models.PostgresModel):
     fields = dict(
-        id=phiorm.models.IntField(primary_key=True),
-        name=phiorm.models.StrField(default='nome'),
+        id=models.IntField(primary_key=True),
+        name=models.StrField(default='nome'),
     )
+
+Test.filter(id=1, name='cavalo')
+Test.filter(id=1, name='trem')

@@ -1,17 +1,14 @@
 {
-    "python.pythonPath": ".env/bin/python",
+    "python.pythonPath": ".venv/bin/python",
     "python.languageServer": "Pylance",
-    "[python]": {
-        "gitlens.codeLens.symbolScopes": [
-            "!Module"
-        ],
-        "editor.wordBasedSuggestions": false,
-        "editor.rulers": [79,],
-    },
+    // "[python]": {
+    //     "editor.wordBasedSuggestions": false,
+    //     "editor.rulers": [79,],
+    // },
     "search.exclude": {
         "**/node_modules": true,
         "**/bower_components": true,
         "**/*.code-search": true,
-        "**/.env": true,
+        "**/.venv": true,
     },
 }

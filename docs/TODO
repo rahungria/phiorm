@@ -8,7 +8,7 @@ postgres save
 foreign key cascade
 float field, datetime field
 table indexes
-model cache dedicated object
+#model cache dedicated object
 many to many abstraction... HARD
 refactor _cache to proper object with more functionality
 add queryset like class for more transparency

@@ -20,5 +20,6 @@ Models
         dedicated object to allow liberty of how to handle data queries/etc...
         cache must allow objects with multiple columns pk and store objects based on ALL its indexes! so that cache[index] should result in success if present
         the cache should not be used on searches without a given index
+        A multiple indexed cache will have multiple copies of the model at different keys, so it must somehow keep track of the copies to maintain only one version at a time / consistency
     allow for simple serialization/deserialization
 

@@ -1,9 +1,12 @@
 import json
+import re
 from copy import deepcopy
 from abc import ABC, abstractmethod
 
+import phicache
+
 from phiorm import exceptions
-from phiorm import settings
+from phiorm import conf
 from phiorm import db
 
 
@@ -42,8 +45,8 @@ class Model(ABC):
     '''
     # TODO custom _cache object->hold memory of some cache inserts on same pk
     # use algorithm to prefer one ever another/allow extending...
-    _cache = dict()
-    # fields = dict()
+    _cache = phicache.Cache()
+    fields = dict()
 
     def __init__(self, **kwargs):
         if not type(self).fields:
@@ -53,8 +56,8 @@ class Model(ABC):
                 '(using the orm.fields.Field object)'
             )
         self.__dict__['fields'] = deepcopy(type(self).fields)
-        self.__validate_kwargs_in_fields(**kwargs)
-        self.__validate_primary_key_exists()
+        self._validate_kwargs_in_fields(**kwargs)
+        self._validate_primary_key_exists()
 
         # TODO add support for multiple pks
         pk_count = 0
@@ -91,10 +94,10 @@ class Model(ABC):
         if name in self.fields:
             return self.fields[name].get()
         else:
-            return super().__getattr__(name)
+            return super().__getattr__(name)  # type: ignore
 
     @classmethod
-    def __validate_kwargs_in_fields(cls, greedy=False,**kwargs):
+    def _validate_kwargs_in_fields(cls, greedy=False,**kwargs):
         '''
         helper to determine if args passed to function
         exist in this model's fields
@@ -118,14 +121,15 @@ class Model(ABC):
             )
         return True
 
-    def __validate_primary_key_exists(self):
+    @classmethod
+    def _validate_primary_key_exists(cls):
         _pk_count = 0
-        for field in self.fields:
-            if self.fields[field].primary_key:
+        for field in cls.fields:
+            if cls.fields[field].primary_key:
                 _pk_count += 1
         if _pk_count == 0:
             raise exceptions.FieldError(
-                f'{type(self).__name__} has no primary keys!',
+                f'{cls.__name__} has no primary keys!',
                 fields=tuple()
             )
 
@@ -147,7 +151,7 @@ class Model(ABC):
     # TODO implement proper fk deserialization
     # TODO support data in form of kwargs (default to None... maybe?)
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data, many=False):
         '''
         deserializes a tuple (data) into an object an instance of this
         model's object
@@ -155,20 +159,39 @@ class Model(ABC):
         loads into cache 
         '''
         # TODO raise exceptions...
-        assert type(data) is tuple
+        if not many:
+            assert type(data) is tuple
+        else:
+            assert type(data) is list
         assert len(cls.fields) == len(data)
 
-        kwargs = {}
-        for i, key in enumerate(cls.fields):
-            deserialized_data = cls.fields[key].deserialize(data[i])
-            kwargs[key] = deserialized_data
-        obj = cls(**kwargs)
-        cls._cache[obj.pk()] = obj
-        return obj
+        if not many:
+            kwargs = {}
+            for i, key in enumerate(cls.fields):
+                deserialized_data = cls.fields[key].deserialize(data[i])
+                kwargs[key] = deserialized_data
+            obj = cls(**kwargs)
+            cls._cache[obj.pk()] = obj
+            return obj
+        else:
+            return_data = []
+            for d in data:
+                kwargs = {}
+                for i, key in enumerate(cls.fields):
+                    deserialized_data = cls.fields[key].deserialize(d[i])
+                    kwargs[key] = deserialized_data
+                obj = cls(**kwargs)
+                cls._cache[obj.pk()] = obj
+                return_data.append(obj)
+            return return_data
+
 
     @classmethod
-    def from_dict(cls, _dict):
-        return cls(**_dict)
+    def deserialize_dict(cls, _dict):
+        data = []
+        for k in _dict:
+            data.append(_dict[k])
+        return cls.deserialize(tuple(data))
 
     # TODO add support for multiple pks
     def pk(self):
@@ -226,4 +249,13 @@ class Model(ABC):
 
         usualy not implemented by a User Leaf...
         '''
-        return db.ConnectionManager.get(name=settings.DATABASE['DBDRIVER'])
+        return db.ConnectionManager.get(
+            conf.Settings.get().DATABASE['DBDRIVER']
+        )
+
+    _name_ptrn = a = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))')
+
+    @classmethod
+    @property
+    def table_name(cls):
+        return cls._name_ptrn.sub(r'_\1', cls.__name__).lower()

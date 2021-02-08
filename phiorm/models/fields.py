@@ -85,7 +85,7 @@ class Field:
                 return self.get()
             else:
                 raise exceptions.ValidationError(
-                    f"this {self.__name__} field can't be null"
+                    f"this {type(self).__name__} field can't be null"
                 )
 
         # type validation

@@ -13,7 +13,7 @@ setuptools.setup(
     name="phiorm",
     packages=['phiorm'],
     version=phiorm.__version__,
-    author="Raphael Hungria",
+    author="raphi",
     author_email="rhja93@gmail.com",
     description="simple ORM for personal usage",
     long_description=long_description,
@@ -21,6 +21,7 @@ setuptools.setup(
     url=github_url,
     download_url=f'{github_url}/archive/{phiorm.__version__}.tar.gz',
     license='MIT',
+    # install_requires= [],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

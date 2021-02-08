@@ -1,10 +1,9 @@
 import psycopg2
 
-from phiorm import settings
-from phiorm import exceptions
-
 import philog
 
+import phiorm.conf as conf
+import phiorm.exceptions as exceptions
 
 
 # TODO: abstract connection closing for every driver...
@@ -16,20 +15,20 @@ class ConnectionManager:
     @classmethod
     def get(cls, name='connection'):
         if name not in cls._connections:
-            if settings.DATABASE['DBDRIVER'] == 'psycopg2':
+            if conf.Settings.get().DATABASE['DBDRIVER'] == 'psycopg2':
                 cls._connections[name] = psycopg2.connect(
-                    database=settings.DATABASE['DATABASE'],
-                    user=settings.DATABASE['DB_USER'],
-                    password=settings.DATABASE['DB_PASSWORD'],
-                    host=settings.DATABASE['DB_HOST'],
-                    port=settings.DATABASE['DB_PORT'],
+                    database=conf.Settings.get().DATABASE['DATABASE'],
+                    user=conf.Settings.get().DATABASE['DB_USER'],
+                    password=conf.Settings.get().DATABASE['DB_PASSWORD'],
+                    host=conf.Settings.get().DATABASE['DB_HOST'],
+                    port=conf.Settings.get().DATABASE['DB_PORT'],
                 )
                 philog.info(
-                    f"Created connection '{name}' to "
-                    f"{settings.DATABASE['DATABASE']}://"
-                    f"{settings.DATABASE['DB_USER']}"
-                    f"@{settings.DATABASE['DB_HOST']}:"
-                    f"{settings.DATABASE['DB_PORT']}"
+                    f"Created connection '{name}' to '"
+                    f"{conf.Settings.get().DATABASE['DATABASE']}://"
+                    f"{conf.Settings.get().DATABASE['DB_USER']}"
+                    f"@{conf.Settings.get().DATABASE['DB_HOST']}:"
+                    f"{conf.Settings.get().DATABASE['DB_PORT']}'"
                 )
         elif cls._connections[name].closed:
             raise exceptions.ConnectionError(
@@ -41,6 +40,13 @@ class ConnectionManager:
     def close(cls, name='connection'):
         try:
             cls._connections[name].close()
+            philog.info(
+                    f"Closed connection '{name}' to '"
+                    f"{conf.Settings.get().DATABASE['DATABASE']}://"
+                    f"{conf.Settings.get().DATABASE['DB_USER']}"
+                    f"@{conf.Settings.get().DATABASE['DB_HOST']}:"
+                    f"{conf.Settings.get().DATABASE['DB_PORT']}'"
+                )
         except KeyError:
             raise exceptions.ConnectionError(
                 "tried closing connection that doesn't exist"

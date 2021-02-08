@@ -3,6 +3,7 @@ ipython < 7.20
 jedi < 0.18
 pytest
 
-philog < 0.2
+philog < 1.0
+phicache < 1.0
 psycopg2-binary < 2.9
 python-dotenv < 0.16
