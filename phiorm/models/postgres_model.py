@@ -15,11 +15,14 @@ class PostgresModel(model.Model):
         conn = self.get_connection()
 
     # TODO support multiple pks
+    # TODO None/null args
     @classmethod
     def filter(cls, pk=None, **kwargs):
+        # TODO still garbage fix it!
         cls._validate_kwargs_in_fields(greedy=True, **kwargs)
         # TODO support setting table indexes explicitly and 
         # adapting the cache acording to the indexes
+        cached_obj = None
         for key in kwargs:
         # for index in cls.indexes:
             # pks.append(cls.indexes[index])
@@ -28,7 +31,12 @@ class PostgresModel(model.Model):
                 # return cls._cache[pk]
             if cls.fields[key].primary_key:
                 if kwargs[key] in cls._cache:
-                    return cls._cache[pk]
+                    # TODO WHERE FIELDS ...
+                    cached_obj = cls._cache[kwargs[key]]
+                    break
+        if cached_obj:
+            # TODO iterate through args, validate and either return or continue
+            pass
 
         # regular db queries
         query = "SELECT * FROM {table} {where};"
@@ -54,7 +62,7 @@ class PostgresModel(model.Model):
             raise exceptions.ORMError(
                 f'postgresql Programming Error: {e}'
             )
-        return cls.deserialize(data, many=len(data))
+        return cls.deserialize(data, many=True)
 
     def delete(self):
         raise NotImplementedError

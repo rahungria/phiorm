@@ -163,7 +163,6 @@ class Model(ABC):
             assert type(data) is tuple
         else:
             assert type(data) is list
-        assert len(cls.fields) == len(data)
 
         if not many:
             kwargs = {}
