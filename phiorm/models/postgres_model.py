@@ -39,8 +39,8 @@ class PostgresModel(model.Model):
             pass
 
         # regular db queries
-        query = "SELECT * FROM {table} {where};"
         where =  f"WHERE {' AND '.join([f'{k}=%({k})s' for k in kwargs])}"
+        query = f"SELECT * FROM {cls.table_name} {where};"
 
         # TODO add/convert PK to a collumn in  the query here...
         conn = cls.get_connection()
@@ -50,12 +50,12 @@ class PostgresModel(model.Model):
                 with conn.cursor() as cursor:
                     if kwargs:
                         cursor.execute(
-                            query.format(table=cls.table_name, where=where),
+                            query,
                             kwargs
                         )
                     else:
                         cursor.execute(
-                            query.format(table=cls.table_name, where="")
+                            query
                         )
                     data = cursor.fetchall()
         except psycopg2.ProgrammingError as e:

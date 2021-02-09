@@ -113,6 +113,8 @@ class Model(ABC):
                 entries.append(entry)
                 if greedy:
                     break
+            else:
+                cls.fields[entry].validate(kwargs[entry])
         if entries:
             raise exceptions.FieldError(
                 f"columns: {tuple(entries)} don't exist in "

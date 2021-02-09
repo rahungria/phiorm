@@ -36,6 +36,7 @@ class Field:
     Extendable by overriding the "__call__" and "get" methods
     '''
     def __init__(self, _type, **kwargs):
+        self._validate__init_kwargs(kwargs)
         self.type = _type
         self.primary_key = kwargs.get('primary_key', False)
         self.default = kwargs.get('default', None)
@@ -52,6 +53,13 @@ class Field:
         self.validators.extend(_validators)
         self.value = None
 
+    ACCEPTED_KWARGS = ['default', 'null', 'primary_key', 'validators']
+
+    def _validate__init_kwargs(self, kwargs):
+        for arg in kwargs:
+            if arg not in self.ACCEPTED_KWARGS:
+                raise TypeError(f"Invalid kwarg '{arg}'")
+
     def serialize(self):
         return self.get()
 
@@ -59,8 +67,34 @@ class Field:
         return self.set(value=value)
 
     def validate(self, value):
+        '''
+        Does all validation relating to a value
+
+        Extend this method to add behaviour
+
+        does not return any value, but should raise ValidationError
+        if case of any failure
+        '''
+        # default validation
+        if value is None:
+            if self.default:
+                return self.default
+            elif self.null:
+                return None
+            else:
+                raise exceptions.ValidationError(
+                    f"this {type(self).__name__} field can't be null"
+                )
+        # type validation
+        if type(value) is not self.type:
+            raise exceptions.ValidationError(
+                f'Invalid type: expected {self.type}, '
+                f'received {type(value)}'
+            )
+        #explicit validators
         for validator in self.validators:
             validator(value)
+        return value
 
     def get(self):
         return self.value
@@ -69,37 +103,9 @@ class Field:
         '''
         The field is called every time it is set.
 
-        Handles validation, exception raising and argument adjustments.
-
-        Every context dependant validation should be implemented by
-        inheritance/extension of this method,
-        instead of using the validators system
+        handles validation, exception raising and argument adjustments.
         '''
-        # null/default validation
-        if value is None:
-            if self.default:
-                self.value = self.default
-                return self.get()
-            elif self.null:
-                self.value = None
-                return self.get()
-            else:
-                raise exceptions.ValidationError(
-                    f"this {type(self).__name__} field can't be null"
-                )
-
-        # type validation
-        if type(value) is not self.type:
-            raise exceptions.ValidationError(
-                f'Invalid type: expected {self.type}, '
-                f'received {type(value)}'
-            )
-
-        # explicit validators
-        self.validate(value)
-
-        self.value = value
-        return self.get()
+        self.value = self.validate(value)
 
     def __str__(self):
         self_vars = []
@@ -113,13 +119,11 @@ class Field:
 
 
 class IntField(Field):
-
     def __init__(self, **kwargs):
         super().__init__(_type=int, **kwargs)
 
 
 class StrField(Field):
-
     def __init__(self, max_length=255, **kwargs):
         super().__init__(_type=str, **kwargs)
         self.max_length = max_length
@@ -132,7 +136,6 @@ class StrField(Field):
 
 
 class ForeignKeyField(Field):
-
     def __init__(self, ref_model, **kwargs):
         super().__init__(_type=ref_model, **kwargs)
         if not issubclass(ref_model, model.Model):
