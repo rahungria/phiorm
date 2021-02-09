@@ -1,5 +1,4 @@
 from phiorm import exceptions
-import philog
 import psycopg2
 from . import model
 
@@ -28,10 +27,8 @@ class PostgresModel(model.Model):
             # if pk in cls._cache:
                 # return cls._cache[pk]
             if cls.fields[key].primary_key:
-                pk = kwargs[key]
-        if pk:
-            if pk in cls._cache:
-                return cls._cache[pk]
+                if kwargs[key] in cls._cache:
+                    return cls._cache[pk]
 
         # regular db queries
         query = "SELECT * FROM {table} {where};"
@@ -49,24 +46,15 @@ class PostgresModel(model.Model):
                             kwargs
                         )
                     else:
-                        cursor.execute(query.format(table=cls.table_name, where=""))
+                        cursor.execute(
+                            query.format(table=cls.table_name, where="")
+                        )
                     data = cursor.fetchall()
         except psycopg2.ProgrammingError as e:
             raise exceptions.ORMError(
                 f'postgresql Programming Error: {e}'
             )
-        if data:
-            if len(data)>1:
-                return cls.deserialize(data, many=True)
-            else:
-                return cls.deserialize(data[0], many=False)
-        else:
-            return None
-            # obj = cls(**kwargs)
-            # cls._cache[pk] = obj
-            # return obj
-        
-        # conn = cls.get_connection()
+        return cls.deserialize(data, many=len(data))
 
     def delete(self):
         raise NotImplementedError
