@@ -1,10 +1,16 @@
 from phiorm.models.query import query
+from phiorm.util import tree
 
 
 class psqlQ(query.Q):
-    def __init__(self, query=None, left=None, right=None, _kwargs={},**kwargs):
+    def __init__(
+        self,
+        query:str=None,
+        left:'tree'=None, right:'tree'=None,
+        **kwargs
+    ):
         self.query = query
-        self._kwargs = _kwargs
+        self._kwargs = {}
         self.negative = False
         self.left = left
         self.right = right

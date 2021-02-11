@@ -1,3 +1,4 @@
+from phiorm.models.query.psqlQ import psqlQ
 from phiorm import exceptions
 import psycopg2
 from . import model
@@ -17,13 +18,29 @@ class PostgresModel(model.Model):
     # TODO support multiple pks
     # TODO None/null args
     @classmethod
-    def filter(cls, pk=None, **kwargs):
+    def filter(cls, q: 'psqlQ|None'=None, pk=None, **kwargs):
         # TODO still garbage fix it!
+        if q is not None and kwargs:
+            raise exceptions.ORMError("filter can't have 'q' and 'kwargs'")
         cls._validate_kwargs_in_fields(greedy=True, **kwargs)
+
+        query = "SELECT * FROM {table} {where};"
+
+        if kwargs:
+            kwQ = psqlQ(**kwargs)
+            if q:
+                q = q & kwQ
+            else:
+                q = kwQ
+            query = query.format(
+                table=cls.table_name,
+                where=f" WHERE {q.evaluate()}"
+            )
+        else:
+            query = query.format(table=cls.table_name, where="")
+
         # TODO support setting table indexes explicitly and 
         # adapting the cache acording to the indexes
-        where =  f"WHERE {' AND '.join([f'{k}=%({k})s' for k in kwargs])}"
-        query = f"SELECT * FROM {cls.table_name} {where};"
 
         # TODO add/convert PK to a collumn in  the query here...
         conn = cls.get_connection()
@@ -31,20 +48,13 @@ class PostgresModel(model.Model):
         try:
             with conn:
                 with conn.cursor() as cursor:
-                    if kwargs:
-                        cursor.execute(
-                            query,
-                            kwargs
-                        )
+                    if kwargs or q:
+                        cursor.execute(query, q.kwargs())
                     else:
-                        cursor.execute(
-                            query
-                        )
+                        cursor.execute(query)
                     data = cursor.fetchall()
         except psycopg2.ProgrammingError as e:
-            raise exceptions.ORMError(
-                f'postgresql Programming Error: {e}'
-            )
+            raise exceptions.ORMError(f'postgresql Programming Error: {e}')
         return cls.deserialize(data, many=True)
 
     def delete(self):

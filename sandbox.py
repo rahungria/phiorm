@@ -16,5 +16,6 @@ q.evaluate()
 
 q1 = psqlQ(hope=None, id=2, carlos='carlos')
 q1.evaluate()
-Test.filter(id=1, name='cavalo')
-Test.filter(id=1, name='trem')
+Test.filter()
+Test.filter(id=1)
+Test.filter(id=2, name='cavalo')
