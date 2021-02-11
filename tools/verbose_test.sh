@@ -1,3 +1,2 @@
 source .venv/bin/activate
-python -m pytest $1
-
+python -m pytest -vv $1
