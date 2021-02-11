@@ -22,23 +22,6 @@ class PostgresModel(model.Model):
         cls._validate_kwargs_in_fields(greedy=True, **kwargs)
         # TODO support setting table indexes explicitly and 
         # adapting the cache acording to the indexes
-        cached_obj = None
-        for key in kwargs:
-        # for index in cls.indexes:
-            # pks.append(cls.indexes[index])
-        # for pk in pks:
-            # if pk in cls._cache:
-                # return cls._cache[pk]
-            if cls.fields[key].primary_key:
-                if kwargs[key] in cls._cache:
-                    # TODO WHERE FIELDS ...
-                    cached_obj = cls._cache[kwargs[key]]
-                    break
-        if cached_obj:
-            # TODO iterate through args, validate and either return or continue
-            pass
-
-        # regular db queries
         where =  f"WHERE {' AND '.join([f'{k}=%({k})s' for k in kwargs])}"
         query = f"SELECT * FROM {cls.table_name} {where};"
 

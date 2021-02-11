@@ -64,7 +64,7 @@ class Field:
         return self.get()
 
     def deserialize(self, value):
-        return self.set(value=value)
+        return self.set(value)
 
     def validate(self, value):
         '''
